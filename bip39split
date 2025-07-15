@@ -1,8 +1,9 @@
 #!/bin/bash
 
 SEED="$1"
+FILE="$2"
 if [ -z "$SEED" ]; then
-  echo "Usage: bip39split \"<24-word-seed-phrase>\""
+  echo "Usage: bip39split \"<24-word-seed-phrase>\" <file-with-3-or-more-shares>"
   exit 1
 fi
 
@@ -19,6 +20,9 @@ except Exception as e:
 
 shares = generate_mnemonics(group_threshold=1, groups=[(3, 5)], master_secret=secret)
 
-for i, share in enumerate(shares[0], 1):
-    print(f"Share {i}: {' '.join(share)}")
+with open("$FILE","w") as fw:
+
+    for i, share in enumerate(shares[0], 1):
+        print(f"Share {i}: {''.join(share)}")
+        fw.write("".join(share) + "\n")
 EOF
