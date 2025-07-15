@@ -11,9 +11,10 @@ from shamir_mnemonic import combine_mnemonics
 from mnemonic import Mnemonic
 
 try:
+    print(f"Reading $FILE")
     with open("$FILE", 'r') as f:
         lines = f.readlines()
-    shares = [line.strip().split() for line in lines if line.strip()]
+    shares = [line.strip() for line in lines if line.strip()]
     if len(shares) < 3:
         print("❌ At least 3 shares are required.")
         exit(1)
