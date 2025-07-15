@@ -1,0 +1,24 @@
+#!/bin/bash
+
+SEED="$1"
+if [ -z "$SEED" ]; then
+  echo "Usage: bip39split \"<24-word-seed-phrase>\""
+  exit 1
+fi
+
+python3 - <<EOF
+from shamir_mnemonic import generate_mnemonics
+from mnemonic import Mnemonic
+
+mnemo = Mnemonic("english")
+try:
+    secret = mnemo.to_entropy("$SEED")
+except Exception as e:
+    print("❌ Invalid BIP39 seed phrase:", e)
+    exit(1)
+
+shares = generate_mnemonics(group_threshold=1, groups=[(3, 5)], master_secret=secret)
+
+for i, share in enumerate(shares[0], 1):
+    print(f"Share {i}: {' '.join(share)}")
+EOF
