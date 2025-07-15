@@ -1,0 +1,1 @@
+echo "from mnemonic import Mnemonic; print(Mnemonic('english').generate(strength=256))" | python3
