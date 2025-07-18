@@ -1,0 +1,8 @@
+# BIP39 Shamir Secret Sharing Requirements
+# Core dependencies for BIP39 mnemonic generation and Shamir Secret Sharing
+
+# BIP39 mnemonic generation and validation
+mnemonic>=0.20
+
+# Shamir Secret Sharing implementation
+shamir-mnemonic>=0.2.2 

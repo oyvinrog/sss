@@ -1,0 +1,22 @@
+#!/bin/bash
+
+# BIP39 Shamir Secret Sharing Verification Test Runner
+
+echo "🔐 BIP39 Shamir Secret Sharing Test Suite"
+echo "=========================================="
+echo
+
+# Check if number of test phrases is provided
+NUM_TESTS=${1:-5}
+
+echo "Running verification with $NUM_TESTS test phrases..."
+echo
+
+# Run the Python verification script
+python3 test_bip39_verification.py "$NUM_TESTS"
+
+echo
+echo "🔍 For manual testing, you can also:"
+echo "   • Generate a test phrase: ./generate_testphrase"
+echo "   • Split it: ./bip39split \"<phrase>\" shares.txt"
+echo "   • Combine it: ./bip39combine shares.txt" 
