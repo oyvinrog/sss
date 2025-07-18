@@ -1,9 +1,0 @@
-#!/bin/bash
-
-FILE="$1"
-if [ -z "$FILE" ]; then
-  echo "Usage: bip39combine <file-with-3-or-more-shares>"
-  exit 1
-fi
-
-python3 combine.py "$FILE"

@@ -18,5 +18,5 @@ python3 test_bip39_verification.py "$NUM_TESTS"
 echo
 echo "🔍 For manual testing, you can also:"
 echo "   • Generate a test phrase: ./generate_testphrase"
-echo "   • Split it: ./bip39split \"<phrase>\" shares.txt"
-echo "   • Combine it: ./bip39combine shares.txt" 
+echo "   • Split it: python3 split.py \"<phrase>\" shares.txt"
+echo "   • Combine it: head -n 3 shares.txt > 3shares.txt && python3 combine.py 3shares.txt" 
