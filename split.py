@@ -23,6 +23,12 @@ def split_bip39_to_shares(seed_phrase, output_file=None):
     except Exception as e:
         raise ValueError(f"Invalid BIP39 seed phrase: {e}")
     
+    # Display the original seed's hexadecimal representation
+    hex_entropy = secret.hex()
+    print(f"🔑 Original Seed Hex: {hex_entropy}")
+    print(f"📏 Entropy Length: {len(secret)} bytes ({len(secret) * 8} bits)")
+    print()
+    
     # Generate 5 shares with threshold of 3 (3 of 5 scheme)
     shares = generate_mnemonics(group_threshold=1, groups=[(3, 5)], master_secret=secret)
     

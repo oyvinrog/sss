@@ -34,6 +34,13 @@ def combine_shares_to_bip39(shares_file=None, shares_list=None):
     
     try:
         secret = combine_mnemonics(shares)
+        
+        # Display the recovered seed's hexadecimal representation
+        hex_entropy = secret.hex()
+        print(f"🔑 Recovered Seed Hex: {hex_entropy}")
+        print(f"📏 Entropy Length: {len(secret)} bytes ({len(secret) * 8} bits)")
+        print()
+        
         mnemo = Mnemonic("english")
         phrase = mnemo.to_mnemonic(secret)
         return phrase

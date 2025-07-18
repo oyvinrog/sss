@@ -25,7 +25,7 @@ def split_bip39_to_shares_quiet(seed_phrase):
         share_string = "".join(share)
         share_strings.append(share_string)
     
-    return share_strings
+    return share_strings, secret
 
 
 class BIP39TestVerification:
@@ -58,10 +58,11 @@ class BIP39TestVerification:
             self.failed_tests += 1
 
     def test_basic_split_and_combine(self, test_phrase):
-        """Test basic splitting and combining functionality"""
+        """Test basic splitting and combining functionality with hex verification"""
         try:
             # Split the phrase (using quiet version)
-            shares = split_bip39_to_shares_quiet(test_phrase)
+            shares, original_secret = split_bip39_to_shares_quiet(test_phrase)
+            original_hex = original_secret.hex()
             
             # Verify we get 5 shares
             if len(shares) != 5:
@@ -71,12 +72,21 @@ class BIP39TestVerification:
             # Combine first 3 shares (threshold requirement)
             recovered_phrase = combine_shares_to_bip39(shares_list=shares[:3])
             
+            # Verify the recovered entropy matches original
+            recovered_secret = self.mnemo.to_entropy(recovered_phrase)
+            recovered_hex = recovered_secret.hex()
+            
             # Verify recovery matches original
-            if recovered_phrase == test_phrase:
-                self.log_test("Basic Split & Combine", True, "First 3 shares successfully recovered original phrase")
+            if recovered_phrase == test_phrase and original_hex == recovered_hex:
+                self.log_test("Basic Split & Combine", True, 
+                             f"Phrase and hex match (hex: {original_hex[:16]}...)")
                 return True
-            else:
+            elif recovered_phrase != test_phrase:
                 self.log_test("Basic Split & Combine", False, "Recovered phrase doesn't match original")
+                return False
+            else:
+                self.log_test("Basic Split & Combine", False, 
+                             f"Hex mismatch: original {original_hex} vs recovered {recovered_hex}")
                 return False
                 
         except Exception as e:
@@ -84,9 +94,10 @@ class BIP39TestVerification:
             return False
 
     def test_three_random_shares(self, test_phrase, num_iterations=10):
-        """Test combining with 3 random shares multiple times"""
+        """Test combining with 3 random shares multiple times with hex verification"""
         try:
-            shares = split_bip39_to_shares_quiet(test_phrase)
+            shares, original_secret = split_bip39_to_shares_quiet(test_phrase)
+            original_hex = original_secret.hex()
             successful_combinations = 0
             
             for i in range(num_iterations):
@@ -95,12 +106,14 @@ class BIP39TestVerification:
                 
                 try:
                     recovered_phrase = combine_shares_to_bip39(shares_list=random_shares)
+                    recovered_secret = self.mnemo.to_entropy(recovered_phrase)
+                    recovered_hex = recovered_secret.hex()
                     
-                    if recovered_phrase == test_phrase:
+                    if recovered_phrase == test_phrase and original_hex == recovered_hex:
                         successful_combinations += 1
                     else:
                         self.log_test(f"Random 3 Shares (iteration {i+1})", False, 
-                                    "Recovered phrase doesn't match original")
+                                    "Recovered phrase or hex doesn't match original")
                         return False
                         
                 except Exception as e:
@@ -108,7 +121,7 @@ class BIP39TestVerification:
                     return False
             
             self.log_test("Random 3 Shares Test", True, 
-                         f"All {num_iterations} random combinations successful")
+                         f"All {num_iterations} random combinations successful with hex verification")
             return True
             
         except Exception as e:
@@ -116,9 +129,10 @@ class BIP39TestVerification:
             return False
 
     def test_all_possible_combinations(self, test_phrase):
-        """Test all possible 3-share combinations from 5 shares"""
+        """Test all possible 3-share combinations from 5 shares with hex verification"""
         try:
-            shares = split_bip39_to_shares_quiet(test_phrase)
+            shares, original_secret = split_bip39_to_shares_quiet(test_phrase)
+            original_hex = original_secret.hex()
             
             # Generate all possible combinations of 3 shares from 5
             all_combinations = list(itertools.combinations(shares, 3))
@@ -129,12 +143,14 @@ class BIP39TestVerification:
             for i, combination in enumerate(all_combinations):
                 try:
                     recovered_phrase = combine_shares_to_bip39(shares_list=list(combination))
+                    recovered_secret = self.mnemo.to_entropy(recovered_phrase)
+                    recovered_hex = recovered_secret.hex()
                     
-                    if recovered_phrase == test_phrase:
+                    if recovered_phrase == test_phrase and original_hex == recovered_hex:
                         successful_combinations += 1
                     else:
                         self.log_test("All 3-Share Combinations", False, 
-                                    f"Combination {i+1} failed: recovered phrase doesn't match")
+                                    f"Combination {i+1} failed: phrase or hex mismatch")
                         return False
                         
                 except Exception as e:
@@ -143,7 +159,7 @@ class BIP39TestVerification:
                     return False
             
             self.log_test("All 3-Share Combinations", True, 
-                         f"All {len(all_combinations)} combinations successful")
+                         f"All {len(all_combinations)} combinations successful with hex verification")
             return True
             
         except Exception as e:
@@ -153,7 +169,7 @@ class BIP39TestVerification:
     def test_insufficient_shares(self, test_phrase):
         """Test that 2 shares or fewer cannot recover the phrase"""
         try:
-            shares = split_bip39_to_shares_quiet(test_phrase)
+            shares, _ = split_bip39_to_shares_quiet(test_phrase)
             
             # Test with 1 share
             try:
@@ -191,7 +207,7 @@ class BIP39TestVerification:
         
         for i, invalid_phrase in enumerate(invalid_phrases):
             try:
-                shares = split_bip39_to_shares_quiet(invalid_phrase)
+                shares, _ = split_bip39_to_shares_quiet(invalid_phrase)
                 self.log_test(f"Invalid Phrase Test {i+1}", False, 
                             "Should have failed with invalid phrase but didn't")
                 return False
