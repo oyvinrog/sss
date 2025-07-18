@@ -2,24 +2,31 @@
 
 from shamir_mnemonic import generate_mnemonics
 from mnemonic import Mnemonic
+from bip39_utils import expand_bip39_words
 import sys
 
 
 def split_bip39_to_shares(seed_phrase, output_file=None):
     """
     Split a BIP39 seed phrase into Shamir secret shares.
+    Automatically expands 4-character word prefixes to full words.
     
     Args:
-        seed_phrase (str): The 24-word BIP39 seed phrase
+        seed_phrase (str): The 24-word BIP39 seed phrase (can be abbreviated)
         output_file (str, optional): File to write shares to
     
     Returns:
         list: List of Shamir secret shares
     """
+    # First, expand any abbreviated words
+    expanded_phrase = expand_bip39_words(seed_phrase)
+    print(f"📝 Expanded phrase: {expanded_phrase}")
+    print()
+    
     mnemo = Mnemonic("english")
     
     try:
-        secret = mnemo.to_entropy(seed_phrase)
+        secret = mnemo.to_entropy(expanded_phrase)
     except Exception as e:
         raise ValueError(f"Invalid BIP39 seed phrase: {e}")
     
@@ -50,6 +57,8 @@ def split_bip39_to_shares(seed_phrase, output_file=None):
 def main():
     if len(sys.argv) < 2:
         print("Usage: python3 split.py \"<24-word-seed-phrase>\" [output-file]")
+        print("Note: Words can be abbreviated to their first 4 characters")
+        print("Example: python3 split.py \"aban abou abse acci...\" shares.txt")
         sys.exit(1)
     
     seed_phrase = sys.argv[1]

@@ -2,12 +2,14 @@
 
 from shamir_mnemonic import combine_mnemonics
 from mnemonic import Mnemonic
+from bip39_utils import expand_share_words_if_needed
 import sys
 
 
 def combine_shares_to_bip39(shares_file=None, shares_list=None):
     """
     Combine Shamir secret shares back into a BIP39 seed phrase.
+    Automatically expands abbreviated words if they're not in the Shamir wordlist.
     
     Args:
         shares_file (str, optional): File containing shares (one per line)
@@ -32,8 +34,16 @@ def combine_shares_to_bip39(shares_file=None, shares_list=None):
     if len(shares) < 3:
         raise ValueError("At least 3 shares are required.")
     
+    # Smart expansion: only expand words not already in Shamir wordlist
+    processed_shares = []
+    for i, share in enumerate(shares, 1):
+        processed_share = expand_share_words_if_needed(share)
+        processed_shares.append(processed_share)
+        if processed_share != share.lower():
+            print(f"📝 Processed share {i}: {processed_share}")
+    
     try:
-        secret = combine_mnemonics(shares)
+        secret = combine_mnemonics(processed_shares)
         
         # Display the recovered seed's hexadecimal representation
         hex_entropy = secret.hex()
@@ -51,6 +61,7 @@ def combine_shares_to_bip39(shares_file=None, shares_list=None):
 def main():
     if len(sys.argv) < 2:
         print("Usage: python3 combine.py <file-with-3-or-more-shares>")
+        print("Note: Shares can contain words abbreviated to their first 4 characters")
         sys.exit(1)
     
     shares_file = sys.argv[1]
