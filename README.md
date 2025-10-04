@@ -2,7 +2,7 @@
 
 Split your private key into 5 separate keyphrases using Shamir secret sharing (SSS). Any 3 keys will unlock the treasure.
 
-<img src="explanation.png" width="400" height="400">
+<img src="images/explanation.png" width="400" height="400">
 
 Use `split.py` to split your Bitcoin private key into SSS shares
 
@@ -39,8 +39,15 @@ The GUI provides:
 - **Split to USB Keys**: Enter your seed phrase and write all 5 shares sequentially to USB drives
 - **Combine from USB Keys**: Read shares from USB drives and recover your seed phrase
 
+
+
+![image-20251004204040252](images/gui.png)
+
+
+
 **Efficient USB Management:**
 The application automatically detects USB drives with:
+
 - Auto-refreshing list of available USB drives (updates every 2 seconds)
 - Highlights newly inserted drives with a 🆕 NEW indicator
 - Shows drive size and free space information
