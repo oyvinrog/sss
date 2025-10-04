@@ -3,3 +3,5 @@ venv
 KEYS
 __pycache__/
 
+# Claude Code files
+CLAUDE.md
