@@ -21,7 +21,7 @@ Split your private key into 5 separate keyphrases using Shamir secret sharing (S
 Set up a persistent storage.
 
 
-## Step 4: Run SSS
+## Step 4: Install SSS
 
 First, make sure to connect to the internet (TOR)
 
@@ -37,23 +37,9 @@ This will automatically:
 - Set up a Python virtual environment
 - Install all required Python packages
 
-### Manual Install
-
-<details>
-<summary>Click to expand manual installation steps</summary>
-
-```bash
-git clone https://github.com/oyvinrog/sss
-sudo apt install python3-venv
-sudo apt install proxychains
-python3 -m venv .venv
-source .venv/bin/activate
-proxychains pip install -r requirements.txt
-```
-
-</details>
-
 ---
+
+## Step 5: Store your key on the USB pens
 
 **After installation**, disconnect your internet connection, then start the GUI:
 
