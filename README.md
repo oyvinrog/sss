@@ -52,7 +52,8 @@ The application will:
 2. Auto-detect and display available USB drives
 3. Automatically create an `SSS_Shares` directory on each USB
 4. Write share files with metadata and instructions
-5. Validate and combine shares when recovering
+5. When restoring: automatically select the most recent share if multiple versions exist on a USB
+6. Validate and combine shares when recovering
 
 ### Command Line Usage
 

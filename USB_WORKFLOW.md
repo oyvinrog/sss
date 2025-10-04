@@ -101,11 +101,30 @@ Total time: ~2 minutes for all 5 USBs
 Total time: ~1-2 minutes for 3 USBs
 ```
 
+## Smart Share Selection
+
+### Multiple Shares on Same USB
+If a USB drive contains multiple share files (e.g., from different backup sessions), the application automatically:
+- **Selects the most recent share** based on file modification time
+- **Displays all available shares** with timestamps
+- **Logs the selection** for transparency
+
+Example output:
+```
+ℹ️  Found 3 share files, selecting most recent:
+   1. share_1.txt (2025-10-04 14:32:15) ✓ SELECTED
+   2. share_1.txt (2025-09-15 10:20:30)
+   3. share_1.txt (2025-08-01 08:15:00)
+```
+
+This ensures you always use the latest backup without manual selection.
+
 ## Error Handling
 - Graceful fallback if auto-detection fails
 - Manual browse option always available
 - Clear error messages for invalid drives
 - Validation of share files before processing
+- Smart handling of multiple shares on same USB
 
 ## Compatibility
 - Works on all Linux distributions

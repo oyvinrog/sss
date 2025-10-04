@@ -3,6 +3,7 @@
 import sys
 import os
 import subprocess
+import datetime
 from pathlib import Path
 from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, 
@@ -547,15 +548,29 @@ class SSSMainWindow(QMainWindow):
                     
                     if not share_files:
                         raise FileNotFoundError("No share files found on this USB")
-                    
-                    share_file = share_files[0]
                 else:
                     # Find share file in SSS directory
                     share_files = list(sss_dir.glob("share_*.txt"))
                     
                     if not share_files:
                         raise FileNotFoundError("No share files found in SSS_Shares directory")
+                
+                # If multiple share files found, select the most recent one
+                if len(share_files) > 1:
+                    # Sort by modification time, most recent first
+                    share_files.sort(key=lambda f: f.stat().st_mtime, reverse=True)
+                    share_file = share_files[0]
                     
+                    self.log(f"ℹ️  Found {len(share_files)} share files, selecting most recent:")
+                    for idx, sf in enumerate(share_files[:3], 1):  # Show top 3
+                        mtime = sf.stat().st_mtime
+                        mtime_str = datetime.datetime.fromtimestamp(mtime).strftime('%Y-%m-%d %H:%M:%S')
+                        marker = "✓ SELECTED" if idx == 1 else ""
+                        self.log(f"   {idx}. {sf.name} ({mtime_str}) {marker}")
+                    if len(share_files) > 3:
+                        self.log(f"   ... and {len(share_files) - 3} more")
+                    self.log("")
+                else:
                     share_file = share_files[0]
                 
                 # Read share
