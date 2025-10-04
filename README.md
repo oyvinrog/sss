@@ -51,6 +51,14 @@ source .venv/bin/activate
 
 Enter your Bitcoin seed phrase. 
 
+## Later: Recovery of key
+
+1. Run `./run_gui` offline
+2. Select 'Combine'
+3. Select the USB drives with the shares
+4. Validate the recovered key with Electrum (create new wallet with BIP39 seed phrase)
+
+
 
 ## Command Line Usage
 
