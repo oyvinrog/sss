@@ -1,8 +1,49 @@
-## 3 of 5 locking scheme for Bitcoin
+# 3 of 5 locking scheme for Bitcoin
 
 Split your private key into 5 separate keyphrases using Shamir secret sharing (SSS). Any 3 keys will unlock the treasure.
 
 <img src="images/explanation.png" width="400" height="400">
+
+## Step 1: Get your 5 USB keys
+
+![image-20251004205606160](images/image-20251004205606160.png)
+
+
+
+## Step 2: Setup and install Tails OS
+
+<img src="images/image-20251004205829333.png" alt="image-20251004205829333" style="zoom:33%;" />
+
+
+
+## Step 3: Boot from Tails OS
+
+DO NOT use a persistent storage. Tails will make sure that what you are doing will be forgotten.
+
+
+
+## Step 4: Run SSS
+
+First, make sure to connect to the internet (TOR)
+
+```bash
+git clone https://github.com/oyvinrog/sss
+sudo apt install python3-venv
+sudo apt install proxychains
+python3 -m venv .venv
+source .venv/bin/activate
+proxychains pip install -r requirements.txt
+
+```
+
+Disconnect your internet connection, then start the GUI:
+
+`./run_gui`
+
+Enter your Bitcoin seed phrase. 
+
+
+## Command Line Usage
 
 Use `split.py` to split your Bitcoin private key into SSS shares
 
@@ -10,18 +51,6 @@ Use `combine.py` to combine back again
 
 Use `generate_testphrase` if you want to generate a Bitcoin test seedphrase. This is useful if you want to verify that this utility works.
 
-## Installation
-
-1. Create a virtual environment (recommended):
-```bash
-python3 -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-```
-
-2. Install dependencies:
-```bash
-pip install -r requirements.txt
-```
 
 ## Usage
 
