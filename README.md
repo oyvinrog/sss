@@ -18,13 +18,29 @@ Split your private key into 5 separate keyphrases using Shamir secret sharing (S
 
 ## Step 3: Boot from Tails OS
 
-DO NOT use a persistent storage. Tails will make sure that what you are doing will be forgotten.
-
+Set up a persistent storage.
 
 
 ## Step 4: Run SSS
 
 First, make sure to connect to the internet (TOR)
+
+### Quick Install (One-liner)
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/oyvinrog/sss/main/install.sh | bash
+```
+
+This will automatically:
+- Clone the repository
+- Install system dependencies (python3-venv, proxychains)
+- Set up a Python virtual environment
+- Install all required Python packages
+
+### Manual Install
+
+<details>
+<summary>Click to expand manual installation steps</summary>
 
 ```bash
 git clone https://github.com/oyvinrog/sss
@@ -33,12 +49,19 @@ sudo apt install proxychains
 python3 -m venv .venv
 source .venv/bin/activate
 proxychains pip install -r requirements.txt
-
 ```
 
-Disconnect your internet connection, then start the GUI:
+</details>
 
-`./run_gui`
+---
+
+**After installation**, disconnect your internet connection, then start the GUI:
+
+```bash
+cd sss
+source .venv/bin/activate
+./run_gui
+```
 
 Enter your Bitcoin seed phrase. 
 
