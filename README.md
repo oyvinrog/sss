@@ -25,6 +25,37 @@ pip install -r requirements.txt
 
 ## Usage
 
+### GUI Application (Recommended for USB Management)
+
+The easiest way to manage SSS shares on USB drives is using the graphical interface:
+
+```bash
+./run_gui
+# or
+python3 sss_gui.py
+```
+
+The GUI provides:
+- **Split to USB Keys**: Enter your seed phrase and write all 5 shares sequentially to USB drives
+- **Combine from USB Keys**: Read shares from USB drives and recover your seed phrase
+
+**Efficient USB Management:**
+The application automatically detects USB drives with:
+- Auto-refreshing list of available USB drives (updates every 2 seconds)
+- Highlights newly inserted drives with a 🆕 NEW indicator
+- Shows drive size and free space information
+- One-click or double-click selection
+- Manual browse option as fallback
+
+The application will:
+1. Guide you to insert each USB pen in sequence
+2. Auto-detect and display available USB drives
+3. Automatically create an `SSS_Shares` directory on each USB
+4. Write share files with metadata and instructions
+5. Validate and combine shares when recovering
+
+### Command Line Usage
+
 ### Splitting a BIP39 seed phrase
 
 ```bash
@@ -68,8 +99,11 @@ The test suite will:
 
 ## Files
 
+- `sss_gui.py` - PyQt5 GUI application for USB key management
+- `run_gui` - Launcher script for the GUI application
 - `split.py` - Split BIP39 phrase into Shamir shares
 - `combine.py` - Combine Shamir shares back to BIP39 phrase  
+- `bip39_utils.py` - Utility functions for word expansion
 - `test_bip39_verification.py` - Comprehensive test suite
 - `run_verification_tests` - Convenient test runner
 - `generate_testphrase` - Generate random test BIP39 phrases

@@ -5,4 +5,7 @@
 mnemonic>=0.20
 
 # Shamir Secret Sharing implementation
-shamir-mnemonic>=0.2.2 
+shamir-mnemonic>=0.2.2
+
+# GUI dependencies
+PyQt5>=5.15.0 
