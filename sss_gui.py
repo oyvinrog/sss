@@ -16,6 +16,12 @@ from PyQt5.QtGui import QFont, QIcon
 from split import split_bip39_to_shares
 from combine import combine_shares_to_bip39
 from encryption_utils import encrypt_data, decrypt_data, is_encrypted, read_file_auto_decrypt
+from secure_erase_utils import (
+    secure_erase_usb, 
+    quick_erase_usb_free_space, 
+    get_usb_info, 
+    SecureEraseProgress
+)
 
 
 class USBSelectionDialog(QDialog):
@@ -176,6 +182,196 @@ class USBSelectionDialog(QDialog):
             self.selected_path = usb_path
             self.refresh_timer.stop()
             self.accept()
+
+
+class SecureEraseDialog(QDialog):
+    """Dialog for secure erase options."""
+    
+    def __init__(self, parent, usb_path, usb_info):
+        super().__init__(parent)
+        self.usb_path = usb_path
+        self.usb_info = usb_info
+        self.erase_option = None  # 'none', 'sss', 'all', 'free_space'
+        self.setWindowTitle("Secure Erase USB")
+        self.setMinimumWidth(600)
+        self.init_ui()
+        
+    def init_ui(self):
+        """Initialize the dialog UI."""
+        layout = QVBoxLayout()
+        
+        # Title
+        title = QLabel("🗑️ Secure Erase Options")
+        title_font = QFont()
+        title_font.setPointSize(12)
+        title_font.setBold(True)
+        title.setFont(title_font)
+        layout.addWidget(title)
+        
+        # USB info
+        info_text = f"USB Drive: {self.usb_info['name']}\n"
+        info_text += f"Path: {self.usb_info['path']}\n"
+        info_text += f"Used Space: {self.usb_info['used_gb']:.2f} GB / {self.usb_info['total_gb']:.2f} GB\n"
+        info_text += f"Files on drive: {self.usb_info['file_count']}"
+        
+        if self.usb_info['has_sss_shares']:
+            info_text += f"\n⚠️ SSS_Shares directory found ({self.usb_info['sss_file_count']} files)"
+        
+        info_label = QLabel(info_text)
+        info_label.setStyleSheet("background-color: #f0f0f0; padding: 10px; border-radius: 5px;")
+        info_label.setWordWrap(True)
+        layout.addWidget(info_label)
+        
+        layout.addSpacing(10)
+        
+        # Warning
+        warning = QLabel(
+            "⚠️ WARNING: Secure erase uses multiple overwrite passes with random data.\n"
+            "This process is IRREVERSIBLE and may take several minutes."
+        )
+        warning.setStyleSheet("color: #d9534f; font-weight: bold;")
+        warning.setWordWrap(True)
+        layout.addWidget(warning)
+        
+        layout.addSpacing(10)
+        
+        # Options
+        options_label = QLabel("Choose what to erase:")
+        options_label.setFont(QFont("", 10, QFont.Bold))
+        layout.addWidget(options_label)
+        
+        # Option buttons
+        self.btn_no_erase = QPushButton("✓ Skip - Don't erase anything")
+        self.btn_no_erase.setMinimumHeight(40)
+        self.btn_no_erase.clicked.connect(lambda: self.select_option('none'))
+        layout.addWidget(self.btn_no_erase)
+        
+        self.btn_erase_sss = QPushButton("🗂️ Erase only SSS_Shares directory (Recommended)")
+        self.btn_erase_sss.setMinimumHeight(40)
+        self.btn_erase_sss.clicked.connect(lambda: self.select_option('sss'))
+        self.btn_erase_sss.setEnabled(self.usb_info['has_sss_shares'])
+        if not self.usb_info['has_sss_shares']:
+            self.btn_erase_sss.setText("🗂️ Erase only SSS_Shares directory (Not found)")
+        layout.addWidget(self.btn_erase_sss)
+        
+        self.btn_erase_all = QPushButton("🗑️ Securely erase ALL files on USB")
+        self.btn_erase_all.setMinimumHeight(40)
+        self.btn_erase_all.clicked.connect(lambda: self.select_option('all'))
+        self.btn_erase_all.setStyleSheet("background-color: #ff6b6b;")
+        layout.addWidget(self.btn_erase_all)
+        
+        self.btn_erase_free = QPushButton("💾 Erase free space only (keeps current files)")
+        self.btn_erase_free.setMinimumHeight(40)
+        self.btn_erase_free.clicked.connect(lambda: self.select_option('free_space'))
+        layout.addWidget(self.btn_erase_free)
+        
+        layout.addSpacing(10)
+        
+        # Explanation
+        explanation = QLabel(
+            "• Skip: Keep existing files (fastest)\n"
+            "• SSS_Shares: Remove old SSS shares securely\n"
+            "• ALL files: Complete secure wipe of all data\n"
+            "• Free space: Overwrite previously deleted files"
+        )
+        explanation.setStyleSheet("color: gray; font-size: 9pt;")
+        explanation.setWordWrap(True)
+        layout.addWidget(explanation)
+        
+        layout.addStretch()
+        
+        # Cancel button
+        button_layout = QHBoxLayout()
+        button_layout.addStretch()
+        cancel_button = QPushButton("Cancel")
+        cancel_button.clicked.connect(self.reject)
+        button_layout.addWidget(cancel_button)
+        
+        layout.addLayout(button_layout)
+        self.setLayout(layout)
+    
+    def select_option(self, option):
+        """Handle option selection."""
+        self.erase_option = option
+        
+        if option in ['all', 'free_space']:
+            # Show additional confirmation for destructive operations
+            msg = QMessageBox(self)
+            msg.setIcon(QMessageBox.Warning)
+            msg.setWindowTitle("Confirm Secure Erase")
+            
+            if option == 'all':
+                msg.setText(f"Are you sure you want to SECURELY ERASE ALL files on this USB?\n\n{self.usb_info['name']}")
+                msg.setInformativeText(
+                    f"This will permanently delete {self.usb_info['file_count']} files "
+                    f"using multiple overwrite passes.\n\nThis action CANNOT be undone!"
+                )
+            else:  # free_space
+                msg.setText(f"Erase free space on USB drive?\n\n{self.usb_info['name']}")
+                msg.setInformativeText(
+                    f"This will overwrite {self.usb_info['free_gb']:.2f} GB of free space "
+                    f"with random data to prevent recovery of previously deleted files.\n\n"
+                    f"Current files will NOT be affected.\nThis may take several minutes."
+                )
+            
+            msg.setStandardButtons(QMessageBox.Yes | QMessageBox.No)
+            msg.setDefaultButton(QMessageBox.No)
+            
+            result = msg.exec_()
+            
+            if result != QMessageBox.Yes:
+                return
+        
+        self.accept()
+
+
+class SecureEraseProgressDialog(QDialog):
+    """Dialog showing secure erase progress."""
+    
+    def __init__(self, parent):
+        super().__init__(parent)
+        self.setWindowTitle("Secure Erase in Progress")
+        self.setMinimumWidth(500)
+        self.setModal(True)
+        self.init_ui()
+        
+    def init_ui(self):
+        """Initialize the dialog UI."""
+        layout = QVBoxLayout()
+        
+        # Title
+        title = QLabel("🔄 Securely Erasing Data...")
+        title_font = QFont()
+        title_font.setPointSize(12)
+        title_font.setBold(True)
+        title.setFont(title_font)
+        layout.addWidget(title)
+        
+        # Status label
+        self.status_label = QLabel("Initializing...")
+        layout.addWidget(self.status_label)
+        
+        # Progress bar
+        self.progress_bar = QProgressBar()
+        self.progress_bar.setMinimum(0)
+        self.progress_bar.setMaximum(100)
+        self.progress_bar.setValue(0)
+        layout.addWidget(self.progress_bar)
+        
+        # Info label
+        info_label = QLabel("⏳ Please wait. This may take several minutes depending on the amount of data.")
+        info_label.setWordWrap(True)
+        info_label.setStyleSheet("color: gray; font-style: italic;")
+        layout.addWidget(info_label)
+        
+        layout.addStretch()
+        self.setLayout(layout)
+    
+    def update_progress(self, percent, message):
+        """Update progress bar and status."""
+        self.progress_bar.setValue(percent)
+        self.status_label.setText(message)
+        QApplication.processEvents()  # Update UI
 
 
 class SSSMainWindow(QMainWindow):
@@ -566,6 +762,66 @@ class SSSMainWindow(QMainWindow):
                 return
             
             try:
+                # Get USB info for secure erase dialog
+                try:
+                    usb_info = get_usb_info(usb_path)
+                except Exception as e:
+                    self.log(f"⚠️ Could not get USB info: {e}")
+                    usb_info = {
+                        'name': os.path.basename(usb_path),
+                        'path': usb_path,
+                        'used_gb': 0,
+                        'total_gb': 0,
+                        'free_gb': 0,
+                        'file_count': 0,
+                        'has_sss_shares': False,
+                        'sss_file_count': 0
+                    }
+                
+                # Show secure erase dialog
+                erase_dialog = SecureEraseDialog(self, usb_path, usb_info)
+                erase_result = erase_dialog.exec_()
+                
+                if erase_result != QDialog.Accepted:
+                    self.log(f"❌ Cancelled at Share {i}")
+                    return
+                
+                erase_option = erase_dialog.erase_option
+                
+                # Perform secure erase if requested
+                if erase_option and erase_option != 'none':
+                    self.log(f"🔄 Performing secure erase: {erase_option}")
+                    
+                    progress_dialog = SecureEraseProgressDialog(self)
+                    progress_dialog.show()
+                    
+                    progress = SecureEraseProgress(progress_dialog.update_progress)
+                    
+                    try:
+                        if erase_option == 'sss':
+                            files_erased, errors = secure_erase_usb(usb_path, progress, erase_all=False)
+                            self.log(f"✅ Securely erased SSS_Shares directory ({files_erased} files)")
+                        elif erase_option == 'all':
+                            files_erased, errors = secure_erase_usb(usb_path, progress, erase_all=True)
+                            self.log(f"✅ Securely erased all files ({files_erased} files)")
+                        elif erase_option == 'free_space':
+                            quick_erase_usb_free_space(usb_path, progress)
+                            self.log(f"✅ Securely erased free space")
+                        
+                        if errors > 0:
+                            self.log(f"⚠️ {errors} errors occurred during erase")
+                            
+                    except Exception as e:
+                        self.log(f"❌ Secure erase failed: {str(e)}")
+                        QMessageBox.warning(self, "Erase Error", f"Secure erase failed: {str(e)}\n\nContinuing with write operation...")
+                    finally:
+                        progress_dialog.close()
+                    
+                    self.log("")
+                else:
+                    self.log("ℹ️ Skipping secure erase")
+                    self.log("")
+                
                 # Create SSS directory on USB
                 sss_dir = Path(usb_path) / "SSS_Shares"
                 sss_dir.mkdir(exist_ok=True)

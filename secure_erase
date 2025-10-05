@@ -1,0 +1,208 @@
+#!/usr/bin/env python3
+"""
+Standalone secure erase tool for USB drives.
+Can be used independently of the SSS GUI.
+"""
+
+import sys
+import argparse
+from pathlib import Path
+from secure_erase_utils import (
+    secure_erase_usb,
+    quick_erase_usb_free_space,
+    get_usb_info,
+    SecureEraseProgress
+)
+
+
+def print_progress(percent, message):
+    """Print progress to terminal."""
+    bar_length = 40
+    filled = int(bar_length * percent / 100)
+    bar = '█' * filled + '░' * (bar_length - filled)
+    print(f'\r[{bar}] {percent:3d}% {message}', end='', flush=True)
+    if percent == 100:
+        print()  # New line at completion
+
+
+def main():
+    """Main entry point."""
+    parser = argparse.ArgumentParser(
+        description='Securely erase files on USB drives to prevent recovery',
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  # Show USB info
+  ./secure_erase --info /media/user/USB_DRIVE
+  
+  # Erase only SSS_Shares directory
+  ./secure_erase --sss /media/user/USB_DRIVE
+  
+  # Erase all files on USB
+  ./secure_erase --all /media/user/USB_DRIVE
+  
+  # Erase free space only
+  ./secure_erase --free-space /media/user/USB_DRIVE
+
+Security:
+  - Uses DoD 5220.22-M inspired 3-pass overwrite
+  - Pass 1: Random data
+  - Pass 2: Different random data
+  - Pass 3: Zeros
+  - Prevents recovery by forensic tools
+        """
+    )
+    
+    parser.add_argument(
+        'usb_path',
+        help='Path to USB drive mount point'
+    )
+    
+    mode_group = parser.add_mutually_exclusive_group(required=True)
+    mode_group.add_argument(
+        '--info', '-i',
+        action='store_true',
+        help='Show USB drive information (no erase)'
+    )
+    mode_group.add_argument(
+        '--sss', '-s',
+        action='store_true',
+        help='Erase only SSS_Shares directory (recommended)'
+    )
+    mode_group.add_argument(
+        '--all', '-a',
+        action='store_true',
+        help='Securely erase ALL files on USB (destructive!)'
+    )
+    mode_group.add_argument(
+        '--free-space', '-f',
+        action='store_true',
+        help='Erase free space only (keeps current files)'
+    )
+    
+    parser.add_argument(
+        '--yes', '-y',
+        action='store_true',
+        help='Skip confirmation prompts'
+    )
+    
+    args = parser.parse_args()
+    
+    # Verify USB path exists
+    usb_path = Path(args.usb_path)
+    if not usb_path.exists():
+        print(f"❌ Error: USB path does not exist: {args.usb_path}", file=sys.stderr)
+        return 1
+    
+    # Info mode
+    if args.info:
+        try:
+            info = get_usb_info(args.usb_path)
+            print("USB Drive Information:")
+            print(f"  Path: {info['path']}")
+            print(f"  Name: {info['name']}")
+            print(f"  Total: {info['total_gb']:.2f} GB")
+            print(f"  Used:  {info['used_gb']:.2f} GB")
+            print(f"  Free:  {info['free_gb']:.2f} GB")
+            print(f"  Files: {info['file_count']}")
+            if info['has_sss_shares']:
+                print(f"  SSS_Shares: YES ({info['sss_file_count']} files)")
+            else:
+                print(f"  SSS_Shares: NO")
+            return 0
+        except Exception as e:
+            print(f"❌ Error getting USB info: {e}", file=sys.stderr)
+            return 1
+    
+    # Get USB info for confirmation
+    try:
+        info = get_usb_info(args.usb_path)
+    except Exception as e:
+        print(f"❌ Error getting USB info: {e}", file=sys.stderr)
+        return 1
+    
+    # Confirmation prompts
+    if not args.yes:
+        print("\n" + "="*60)
+        print("SECURE ERASE OPERATION")
+        print("="*60)
+        print(f"USB Drive: {info['name']}")
+        print(f"Path: {info['path']}")
+        print(f"Used: {info['used_gb']:.2f} GB / {info['total_gb']:.2f} GB")
+        print(f"Files: {info['file_count']}")
+        
+        if args.sss:
+            if not info['has_sss_shares']:
+                print("\n⚠️  No SSS_Shares directory found on this USB")
+                print("Nothing to erase.")
+                return 0
+            print(f"\nMode: Erase SSS_Shares directory only")
+            print(f"Files to erase: {info['sss_file_count']}")
+            print("\nThis will:")
+            print("  ✓ Securely erase all files in SSS_Shares/")
+            print("  ✓ Use 3-pass overwrite (random, random, zeros)")
+            print("  ✓ Preserve all other files on USB")
+        elif args.all:
+            print(f"\nMode: Erase ALL files on USB")
+            print(f"Files to erase: {info['file_count']}")
+            print("\n⚠️  WARNING: This will PERMANENTLY DELETE ALL FILES!")
+            print("This will:")
+            print("  ✓ Securely erase ALL files on USB")
+            print("  ✓ Use 3-pass overwrite (random, random, zeros)")
+            print("  ✗ Data CANNOT be recovered")
+        elif args.free_space:
+            print(f"\nMode: Erase free space only")
+            print(f"Free space: {info['free_gb']:.2f} GB")
+            print("\nThis will:")
+            print("  ✓ Keep all current files intact")
+            print("  ✓ Overwrite free space with random data")
+            print("  ✓ Prevent recovery of previously deleted files")
+            print(f"  ⏱  Estimated time: {info['free_gb'] * 2:.0f}-{info['free_gb'] * 4:.0f} seconds")
+        
+        print("\n" + "="*60)
+        response = input("Proceed with secure erase? [y/N]: ")
+        if response.lower() not in ['y', 'yes']:
+            print("Cancelled.")
+            return 0
+        print()
+    
+    # Progress tracker
+    progress = SecureEraseProgress(print_progress)
+    
+    # Perform operation
+    try:
+        if args.sss:
+            print("Securely erasing SSS_Shares directory...")
+            files_erased, errors = secure_erase_usb(args.usb_path, progress, erase_all=False)
+            print(f"\n✅ Success: {files_erased} files securely erased")
+            if errors > 0:
+                print(f"⚠️  Warning: {errors} errors occurred")
+                return 1
+                
+        elif args.all:
+            print("Securely erasing ALL files on USB...")
+            files_erased, errors = secure_erase_usb(args.usb_path, progress, erase_all=True)
+            print(f"\n✅ Success: {files_erased} files securely erased")
+            if errors > 0:
+                print(f"⚠️  Warning: {errors} errors occurred")
+                return 1
+                
+        elif args.free_space:
+            print("Securely erasing free space...")
+            quick_erase_usb_free_space(args.usb_path, progress)
+            print(f"\n✅ Success: Free space securely erased")
+        
+        return 0
+        
+    except KeyboardInterrupt:
+        print("\n\n⚠️  Operation interrupted!")
+        print("Note: Partial erase may have occurred.")
+        return 130
+        
+    except Exception as e:
+        print(f"\n❌ Error: {e}", file=sys.stderr)
+        return 1
+
+
+if __name__ == '__main__':
+    sys.exit(main())

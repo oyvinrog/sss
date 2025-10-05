@@ -2,6 +2,12 @@
 
 Split your private key into 5 separate keyphrases using Shamir secret sharing (SSS). Any 3 keys will unlock the treasure.
 
+**Features:**
+- 🔐 AES-256 encryption for all USB shares
+- 🗑️ Secure erase to prevent data recovery
+- 📱 User-friendly GUI with auto-detection
+- ✅ Comprehensive test suite
+
 <img src="images/explanation.png" width="400" height="400">
 
 ## Step 1: Get your 5 USB keys
@@ -99,6 +105,62 @@ The GUI provides:
 - The system can read unencrypted shares from previous versions
 - When detected, it automatically encrypts them with your current password for added security
 
+### 🗑️ Secure Erase: Prevent Data Recovery
+
+**NEW: Secure erase functionality protects against smart recovery tools:**
+
+When writing shares to USB drives, you'll be offered secure erase options for each USB:
+
+1. **Skip (default)**: Keep existing files, fastest option
+   - Use when USB is new or already clean
+   
+2. **SSS_Shares only (recommended)**: Securely erase only the SSS_Shares directory
+   - Removes old backup shares while keeping other files
+   - Uses 3-pass overwrite: 2 passes with random data + 1 pass with zeros
+   - Prevents recovery of old shares
+   
+3. **ALL files**: Complete secure wipe of entire USB drive
+   - Securely erases ALL files on the USB (excluding system directories)
+   - Multiple overwrite passes with random data
+   - WARNING: Irreversible! All data will be permanently destroyed
+   
+4. **Free space only**: Overwrite previously deleted files
+   - Keeps current files intact
+   - Fills free space with random data to prevent recovery of deleted files
+   - Useful for USBs with sensitive history
+
+**How it works:**
+- Uses DoD 5220.22-M inspired multi-pass overwrite method
+- Pass 1: Random data
+- Pass 2: Different random data  
+- Pass 3: Zeros
+- Then deletes files and directories
+- Progress bar shows real-time status
+
+**Security guarantees:**
+- Prevents recovery by standard file recovery tools
+- Protects against forensic recovery of overwritten data
+- Each file overwritten individually before deletion
+
+📖 **For detailed information, see [SECURE_ERASE.md](SECURE_ERASE.md)**
+
+**Command-line tool:**
+You can also use secure erase independently via command line:
+
+```bash
+# Show USB info
+./secure_erase --info /media/user/USB_DRIVE
+
+# Erase SSS_Shares only (recommended)
+./secure_erase --sss /media/user/USB_DRIVE
+
+# Erase all files (destructive!)
+./secure_erase --all /media/user/USB_DRIVE
+
+# Erase free space
+./secure_erase --free-space /media/user/USB_DRIVE
+```
+
 
 
 ![image-20251004204040252](images/gui.png)
@@ -118,12 +180,17 @@ The application will:
 1. Prompt for a strong encryption password (with confirmation)
 2. Guide you to insert each USB pen in sequence
 3. Auto-detect and display available USB drives
-4. Automatically create an `SSS_Shares` directory on each USB
-5. Encrypt each share with AES-256 and write to USB with metadata
-6. When restoring: prompt for decryption password
-7. Automatically select the most recent share if multiple versions exist on a USB
-8. Decrypt and validate shares when recovering
-9. Automatically encrypt any unencrypted shares from old versions
+4. **Offer secure erase options** (new!):
+   - Skip: Keep existing files
+   - SSS_Shares only: Securely erase previous SSS shares (recommended)
+   - ALL files: Complete secure wipe of USB drive
+   - Free space: Overwrite deleted files to prevent recovery
+5. Automatically create an `SSS_Shares` directory on each USB
+6. Encrypt each share with AES-256 and write to USB with metadata
+7. When restoring: prompt for decryption password
+8. Automatically select the most recent share if multiple versions exist on a USB
+9. Decrypt and validate shares when recovering
+10. Automatically encrypt any unencrypted shares from old versions
 
 ### Command Line Usage
 
@@ -151,6 +218,8 @@ Alternative: You can manually copy any 3 shares into a new file and combine thos
 
 ### Testing and Verification
 
+#### BIP39 and Shamir Secret Sharing Tests
+
 Run comprehensive tests to verify the system works correctly:
 
 ```bash
@@ -168,6 +237,22 @@ The test suite will:
 - Test all possible 3-share combinations
 - Ensure fewer than 3 shares cannot recover the phrase
 
+#### Secure Erase Tests
+
+Test the secure erase functionality:
+
+```bash
+python3 test_secure_erase.py
+```
+
+This will verify:
+- Single file secure erasure
+- SSS_Shares directory erasure (preserving other files)
+- Full USB secure erase
+- USB info gathering functionality
+
+All tests should pass (4/4 tests passed).
+
 ## Files
 
 - `sss_gui.py` - PyQt5 GUI application for USB key management with encryption
@@ -175,12 +260,18 @@ The test suite will:
 - `split.py` - Split BIP39 phrase into Shamir shares
 - `combine.py` - Combine Shamir shares back to BIP39 phrase  
 - `encryption_utils.py` - AES-256 encryption/decryption utilities
+- `secure_erase_utils.py` - Secure erase utilities for USB drives (multi-pass overwrite)
+- `secure_erase` - Command-line tool for secure erase operations
 - `bip39_utils.py` - Utility functions for word expansion
 - `test_bip39_verification.py` - Comprehensive test suite
 - `test_encryption.py` - Encryption functionality tests
+- `test_secure_erase.py` - Secure erase functionality tests
 - `run_verification_tests` - Convenient test runner
 - `generate_testphrase` - Generate random test BIP39 phrases
 - `requirements.txt` - Python dependencies (includes cryptography)
+- `SECURE_ERASE.md` - Detailed documentation about secure erase feature
+- `ENCRYPTION_UPGRADE.md` - Documentation about encryption upgrade
+- `USB_WORKFLOW.md` - USB workflow efficiency improvements
 
 ## Security Notes
 
@@ -204,3 +295,5 @@ The test suite will:
 - Test the recovery process before relying on it
 - Store USB drives in separate, secure locations
 - Keep drives offline and physically secure
+- Use secure erase when reusing USB drives to prevent data recovery
+- Consider "Free space" erase if USB had sensitive files previously deleted
