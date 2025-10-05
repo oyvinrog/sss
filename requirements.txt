@@ -8,4 +8,7 @@ mnemonic>=0.20
 shamir-mnemonic>=0.2.2
 
 # GUI dependencies
-PyQt5>=5.15.0 
+PyQt5>=5.15.0
+
+# AES-256 encryption for USB storage
+cryptography>=41.0.0 

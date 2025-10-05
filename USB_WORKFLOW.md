@@ -72,31 +72,65 @@ USB_DRIVE_NAME 🆕 NEW
     Size: 32.0 GB (Free: 28.5 GB)
 ```
 
+## Security Features
+
+### AES-256 Encryption
+All shares stored on USB drives are encrypted with:
+- **Algorithm**: AES-256-CBC
+- **Key Derivation**: PBKDF2-HMAC-SHA256 (600,000 iterations)
+- **Random Salt & IV**: Each encryption uses unique random values
+- **Password Protection**: User-defined password required for both split and combine
+- **Backward Compatible**: Automatically detects and encrypts old unencrypted shares
+
+### Password Requirements
+- Minimum 8 characters (16+ recommended)
+- Same password used for all 5 shares in a set
+- **⚠️ CRITICAL**: Password cannot be recovered if lost!
+- Store password securely, separate from USB drives
+
+### Encryption on Write
+When splitting keys:
+1. User sets encryption password with confirmation
+2. Shares are generated from seed phrase
+3. Each share is encrypted individually before writing to USB
+4. Encrypted files replace any existing unencrypted versions
+
+### Decryption on Read
+When combining shares:
+1. User provides decryption password
+2. Each share is read and decryption attempted
+3. If wrong password: clear error message, operation stops
+4. If unencrypted share found: read successfully and encrypt it with current password
+5. Successfully decrypted shares are combined to recover seed
+
 ## User Experience Flow
 
 ### Split Operation (Writing 5 Shares)
 ```
-1. Enter seed phrase
-2. For each of 5 shares:
+1. Enter encryption password (with confirmation)
+2. Enter seed phrase
+3. For each of 5 shares:
    a. Dialog opens
    b. Insert USB → Auto-detected → Auto-selected
    c. Click "Select USB"
-   d. Share written with progress feedback
-3. Success message
+   d. Share encrypted with AES-256 and written with progress feedback
+4. Success message
 
 Total time: ~2 minutes for all 5 USBs
 ```
 
 ### Combine Operation (Reading 3-5 Shares)
 ```
-1. Choose number of shares (3-5)
-2. For each share:
+1. Enter decryption password
+2. Choose number of shares (3-5)
+3. For each share:
    a. Dialog opens
    b. Insert USB → Auto-detected → Auto-selected
    c. Click "Select USB"
-   d. Share read with progress feedback
-3. Shares combined and validated
-4. Recovered phrase displayed
+   d. Share read and decrypted with progress feedback
+   e. If old unencrypted share detected, it's automatically encrypted
+4. Shares combined and validated
+5. Recovered phrase displayed
 
 Total time: ~1-2 minutes for 3 USBs
 ```

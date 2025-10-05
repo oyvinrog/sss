@@ -12,9 +12,10 @@ from PyQt5.QtWidgets import (
     QListWidgetItem
 )
 from PyQt5.QtCore import Qt, QThread, pyqtSignal, QTimer
-from PyQt5.QtGui import QFont
+from PyQt5.QtGui import QFont, QIcon
 from split import split_bip39_to_shares
 from combine import combine_shares_to_bip39
+from encryption_utils import encrypt_data, decrypt_data, is_encrypted, read_file_auto_decrypt
 
 
 class USBSelectionDialog(QDialog):
@@ -340,6 +341,27 @@ class SSSMainWindow(QMainWindow):
         self.log("🔐 Starting Split Operation...")
         self.log("=" * 60)
         
+        # Get encryption password first
+        password, ok = self.get_password_input(
+            title="Set Encryption Password",
+            label="Enter a strong password to encrypt the USB pens:",
+            confirm=True
+        )
+        if not ok or not password:
+            self.log("❌ Operation cancelled - no password provided.")
+            return
+        
+        if len(password) < 8:
+            QMessageBox.warning(
+                self, 
+                "Weak Password", 
+                "Password should be at least 8 characters for security.\nPlease try again."
+            )
+            return
+        
+        self.log("✅ Encryption password set")
+        self.log("")
+        
         # Get seed phrase from user
         seed_phrase, ok = self.get_seed_phrase_input()
         if not ok or not seed_phrase:
@@ -353,13 +375,13 @@ class SSSMainWindow(QMainWindow):
             self.log(f"✅ Generated {len(shares)} shares (3-of-5 scheme)")
             self.log("")
             
-            # Display shares
+            # Display shares (first 50 chars only for security)
             for i, share in enumerate(shares, 1):
                 self.log(f"Share {i}: {share[:50]}...")
             self.log("")
             
-            # Ask for USB pens and write shares
-            self.write_shares_to_usb(shares)
+            # Ask for USB pens and write encrypted shares
+            self.write_shares_to_usb(shares, password)
             
         except Exception as e:
             self.log(f"❌ Error: {str(e)}")
@@ -371,9 +393,22 @@ class SSSMainWindow(QMainWindow):
         self.log("🔓 Starting Combine Operation...")
         self.log("=" * 60)
         
+        # Get decryption password first
+        password, ok = self.get_password_input(
+            title="Enter Decryption Password",
+            label="Enter the password used to encrypt the USB pens:",
+            confirm=False
+        )
+        if not ok or not password:
+            self.log("❌ Operation cancelled - no password provided.")
+            return
+        
+        self.log("✅ Password received")
+        self.log("")
+        
         try:
             # Read shares from USB pens
-            shares = self.read_shares_from_usb()
+            shares = self.read_shares_from_usb(password)
             
             if not shares:
                 self.log("❌ Operation cancelled.")
@@ -409,6 +444,67 @@ class SSSMainWindow(QMainWindow):
             self.log(f"❌ Error: {str(e)}")
             QMessageBox.critical(self, "Error", f"Failed to combine: {str(e)}")
             
+    def get_password_input(self, title="Enter Password", label="Enter password:", confirm=False):
+        """Get password input from user with optional confirmation."""
+        from PyQt5.QtWidgets import QDialog, QVBoxLayout, QLabel, QPushButton, QHBoxLayout
+        
+        dialog = QDialog(self)
+        dialog.setWindowTitle(title)
+        dialog.setMinimumWidth(500)
+        
+        layout = QVBoxLayout()
+        
+        label_widget = QLabel(label)
+        label_widget.setWordWrap(True)
+        layout.addWidget(label_widget)
+        
+        password_edit = QLineEdit()
+        password_edit.setEchoMode(QLineEdit.Password)
+        password_edit.setPlaceholderText("Enter password...")
+        layout.addWidget(password_edit)
+        
+        confirm_edit = None
+        if confirm:
+            confirm_label = QLabel("Confirm password:")
+            layout.addWidget(confirm_label)
+            
+            confirm_edit = QLineEdit()
+            confirm_edit.setEchoMode(QLineEdit.Password)
+            confirm_edit.setPlaceholderText("Re-enter password...")
+            layout.addWidget(confirm_edit)
+        
+        hint_label = QLabel("⚠️ Remember this password! It cannot be recovered if lost.")
+        hint_label.setStyleSheet("color: #d9534f; font-weight: bold;")
+        hint_label.setWordWrap(True)
+        layout.addWidget(hint_label)
+        
+        button_layout = QHBoxLayout()
+        ok_button = QPushButton("OK")
+        cancel_button = QPushButton("Cancel")
+        
+        def on_ok():
+            if confirm and password_edit.text() != confirm_edit.text():
+                QMessageBox.warning(dialog, "Password Mismatch", "Passwords do not match. Please try again.")
+                return
+            dialog.accept()
+        
+        ok_button.clicked.connect(on_ok)
+        cancel_button.clicked.connect(dialog.reject)
+        
+        button_layout.addStretch()
+        button_layout.addWidget(ok_button)
+        button_layout.addWidget(cancel_button)
+        
+        layout.addLayout(button_layout)
+        dialog.setLayout(layout)
+        
+        result = dialog.exec_()
+        
+        if result == QDialog.Accepted:
+            return password_edit.text(), True
+        else:
+            return None, False
+    
     def get_seed_phrase_input(self):
         """Get seed phrase input from user."""
         from PyQt5.QtWidgets import QDialog, QVBoxLayout, QLabel, QTextEdit, QPushButton, QHBoxLayout
@@ -453,9 +549,10 @@ class SSSMainWindow(QMainWindow):
         else:
             return None, False
             
-    def write_shares_to_usb(self, shares):
-        """Write shares to USB drives sequentially."""
-        self.log("💾 Ready to write shares to USB drives...")
+    def write_shares_to_usb(self, shares, password):
+        """Write encrypted shares to USB drives sequentially."""
+        self.log("💾 Ready to write encrypted shares to USB drives...")
+        self.log("🔒 All shares will be encrypted with AES-256")
         self.log("")
         
         for i, share in enumerate(shares, 1):
@@ -473,21 +570,34 @@ class SSSMainWindow(QMainWindow):
                 sss_dir = Path(usb_path) / "SSS_Shares"
                 sss_dir.mkdir(exist_ok=True)
                 
-                # Write share to file
+                # Check for existing unencrypted shares and encrypt them
                 share_file = sss_dir / f"share_{i}.txt"
-                with open(share_file, 'w') as f:
-                    f.write(share)
+                if share_file.exists():
+                    self.log(f"⚠️  Found existing share file, will be overwritten with encrypted version")
+                    with open(share_file, 'rb') as f:
+                        existing_data = f.read()
+                    if not is_encrypted(existing_data):
+                        self.log(f"🔄 Encrypting existing plain-text share...")
                 
-                self.log(f"✅ Share {i} written to: {share_file}")
+                # Encrypt share data
+                encrypted_share = encrypt_data(share, password)
+                
+                # Write encrypted share to file
+                with open(share_file, 'wb') as f:
+                    f.write(encrypted_share)
+                
+                self.log(f"✅ Share {i} encrypted and written to: {share_file}")
                 
                 # Write metadata file
                 metadata_file = sss_dir / "README.txt"
                 with open(metadata_file, 'w') as f:
                     f.write(f"SSS Share #{i} of 5\n")
                     f.write(f"Scheme: 3-of-5 (any 3 shares can recover the seed)\n")
+                    f.write(f"Encryption: AES-256-CBC with PBKDF2 key derivation\n")
                     f.write(f"Created by SSS USB Key Manager\n")
                     f.write(f"\n")
                     f.write(f"⚠️  KEEP THIS USB SECURE! ⚠️\n")
+                    f.write(f"⚠️  PASSWORD PROTECTED - DO NOT LOSE YOUR PASSWORD! ⚠️\n")
                 
                 self.log(f"📝 Metadata written to: {metadata_file}")
                 self.log("")
@@ -498,19 +608,20 @@ class SSSMainWindow(QMainWindow):
                 return
         
         self.log("=" * 60)
-        self.log("✅ All shares written successfully!")
+        self.log("✅ All shares encrypted and written successfully!")
         self.log("=" * 60)
         
         QMessageBox.information(
             self,
             "Success",
-            f"All {len(shares)} shares have been written to USB drives successfully!\n\n"
+            f"All {len(shares)} shares have been encrypted with AES-256 and written to USB drives!\n\n"
+            "⚠️ IMPORTANT: Remember your password - it cannot be recovered!\n\n"
             "Store each USB securely in a different location."
         )
         
-    def read_shares_from_usb(self):
-        """Read shares from USB drives."""
-        self.log("📂 Ready to read shares from USB drives...")
+    def read_shares_from_usb(self, password):
+        """Read and decrypt shares from USB drives."""
+        self.log("📂 Ready to read encrypted shares from USB drives...")
         self.log("")
         
         shares = []
@@ -573,9 +684,42 @@ class SSSMainWindow(QMainWindow):
                 else:
                     share_file = share_files[0]
                 
-                # Read share
-                with open(share_file, 'r') as f:
-                    share_content = f.read().strip()
+                # Read share (check if encrypted)
+                with open(share_file, 'rb') as f:
+                    file_data = f.read()
+                
+                if is_encrypted(file_data):
+                    self.log(f"🔒 Share {i} is encrypted, decrypting...")
+                    try:
+                        share_content = decrypt_data(file_data, password)
+                        self.log(f"✅ Share {i} decrypted successfully")
+                    except ValueError as ve:
+                        error_msg = str(ve)
+                        if "password" in error_msg.lower():
+                            self.log(f"❌ Decryption failed: Incorrect password")
+                            QMessageBox.critical(
+                                self, 
+                                "Decryption Error", 
+                                f"Failed to decrypt Share {i}:\n\nIncorrect password!\n\nPlease restart and try again with the correct password."
+                            )
+                            return None
+                        else:
+                            raise
+                else:
+                    # Backward compatibility: handle unencrypted shares from old version
+                    self.log(f"⚠️  Share {i} is NOT encrypted (old format)")
+                    self.log(f"ℹ️  Reading plain-text share for backward compatibility")
+                    share_content = file_data.decode('utf-8').strip()
+                    
+                    # Optionally encrypt it now
+                    try:
+                        self.log(f"🔄 Encrypting unencrypted share for security...")
+                        encrypted_share = encrypt_data(share_content, password)
+                        with open(share_file, 'wb') as f:
+                            f.write(encrypted_share)
+                        self.log(f"✅ Share {i} has been encrypted and updated on USB")
+                    except Exception as enc_err:
+                        self.log(f"⚠️  Could not encrypt share on USB: {enc_err}")
                 
                 shares.append(share_content)
                 self.log(f"✅ Share {i} read from: {share_file}")

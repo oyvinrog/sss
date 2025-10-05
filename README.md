@@ -82,8 +82,22 @@ python3 sss_gui.py
 ```
 
 The GUI provides:
-- **Split to USB Keys**: Enter your seed phrase and write all 5 shares sequentially to USB drives
-- **Combine from USB Keys**: Read shares from USB drives and recover your seed phrase
+- **Split to USB Keys**: Set an encryption password, enter your seed phrase, and write all 5 encrypted shares sequentially to USB drives
+- **Combine from USB Keys**: Enter your password, read encrypted shares from USB drives, and recover your seed phrase
+
+### 🔒 Security: AES-256 Encryption
+
+**All USB shares are now encrypted with AES-256-CBC encryption:**
+
+- Before splitting keys, you'll be prompted to set a strong password (minimum 8 characters)
+- Each share is encrypted using AES-256-CBC with PBKDF2 key derivation (600,000 iterations)
+- Random salt and IV ensure unique ciphertext even for identical data
+- When combining, the same password is required to decrypt the shares
+- **⚠️ CRITICAL**: The password cannot be recovered if lost - store it securely!
+
+**Backward Compatibility:**
+- The system can read unencrypted shares from previous versions
+- When detected, it automatically encrypts them with your current password for added security
 
 
 
@@ -101,12 +115,15 @@ The application automatically detects USB drives with:
 - Manual browse option as fallback
 
 The application will:
-1. Guide you to insert each USB pen in sequence
-2. Auto-detect and display available USB drives
-3. Automatically create an `SSS_Shares` directory on each USB
-4. Write share files with metadata and instructions
-5. When restoring: automatically select the most recent share if multiple versions exist on a USB
-6. Validate and combine shares when recovering
+1. Prompt for a strong encryption password (with confirmation)
+2. Guide you to insert each USB pen in sequence
+3. Auto-detect and display available USB drives
+4. Automatically create an `SSS_Shares` directory on each USB
+5. Encrypt each share with AES-256 and write to USB with metadata
+6. When restoring: prompt for decryption password
+7. Automatically select the most recent share if multiple versions exist on a USB
+8. Decrypt and validate shares when recovering
+9. Automatically encrypt any unencrypted shares from old versions
 
 ### Command Line Usage
 
@@ -153,20 +170,37 @@ The test suite will:
 
 ## Files
 
-- `sss_gui.py` - PyQt5 GUI application for USB key management
+- `sss_gui.py` - PyQt5 GUI application for USB key management with encryption
 - `run_gui` - Launcher script for the GUI application
 - `split.py` - Split BIP39 phrase into Shamir shares
 - `combine.py` - Combine Shamir shares back to BIP39 phrase  
+- `encryption_utils.py` - AES-256 encryption/decryption utilities
 - `bip39_utils.py` - Utility functions for word expansion
 - `test_bip39_verification.py` - Comprehensive test suite
+- `test_encryption.py` - Encryption functionality tests
 - `run_verification_tests` - Convenient test runner
 - `generate_testphrase` - Generate random test BIP39 phrases
-- `requirements.txt` - Python dependencies
+- `requirements.txt` - Python dependencies (includes cryptography)
 
 ## Security Notes
 
+### Shamir Secret Sharing
 - This implements a 3-of-5 threshold scheme
 - Any 3 shares can recover the original seed phrase
 - 2 or fewer shares provide no information about the original
 - Store shares in separate, secure locations
+
+### Encryption
+- **All USB shares are encrypted with AES-256-CBC**
+- Uses PBKDF2 with SHA-256 for key derivation (600,000 iterations)
+- Random salt and IV for each encryption operation
+- Password is required for both split and combine operations
+- **⚠️ PASSWORD CANNOT BE RECOVERED - Store it securely!**
+
+### Best Practices
+- Use a strong, unique password (minimum 8 characters, recommend 16+)
+- Store the password separately from the USB drives
+- Consider using a password manager or physical secure storage
 - Test the recovery process before relying on it
+- Store USB drives in separate, secure locations
+- Keep drives offline and physically secure
