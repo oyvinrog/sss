@@ -2,4 +2,5 @@
 # Launcher script for SSS USB Key Manager GUI
 
 cd "$(dirname "$0")"
+source .venv/bin/activate
 python3 sss_gui.py
